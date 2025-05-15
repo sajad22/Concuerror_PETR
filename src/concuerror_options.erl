@@ -222,7 +222,7 @@
 %% If you want to pass `infinity' as option from the command-line, use `-1'.
 -type dpor() :: 'none' | 'optimal' | 'persistent' | 'source'.
 %% See {@link dpor_option/0} for the meaning of values.
--type scheduling() :: 'oldest' | 'newest' | 'round_robin'.
+-type scheduling() :: 'oldest' | 'newest' | 'round_robin' | 'pair_of_event_type_receive'.
 %% See {@link scheduling_option/0} for the meaning of values.
 -type scheduling_bound_type() :: 'bpor' | 'delay' | 'none' | 'ubpor'.
 %% See {@link scheduling_bound_option/0} for the meaning of values.
@@ -801,7 +801,7 @@ scheduling_option() ->
   , {scheduling, round_robin}
   , "Scheduling order"
   , "How Concuerror picks the next process to run. The available options are"
-    " `oldest', `newest' and `round_robin', with the expected semantics."
+     " `oldest', `newest', `round_robin' and 'pair_of_event_type_receive' , with the expected semantics."
   }.
 
 %% @docfile "doc/strict_scheduling_option.edoc"
@@ -1034,7 +1034,7 @@ check_validity(Key) ->
       {fun(V) -> [] =:= (V -- Valid) end,
        io_lib:format("one or more of ~w", [Valid])};
     scheduling ->
-      [newest, oldest, round_robin];
+      [newest, oldest, round_robin, pair_of_event_type_receive];
     scheduling_bound ->
       {fun(V) -> V >= 0 end, "a non-negative integer"};
     scheduling_bound_type ->

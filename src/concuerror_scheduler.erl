@@ -454,6 +454,135 @@ filter_sleep_set([#event{actor = Actor}|SleepSet], AvailableActors) ->
     end,
   filter_sleep_set(SleepSet, NewAvailableActors).
 
+%%%%%%%%%%% start
+update_map(Receiver, Queue, Map) ->
+  case maps:is_key(Receiver, Map) of
+      true ->
+          OldQueue = maps:get(Receiver, Map),
+          NewQueue = queue:join(Queue, OldQueue),
+          maps:put(Receiver, NewQueue, Map);
+      false ->
+          maps:put(Receiver, Queue, Map)
+  end.
+
+get_data_from_message_event(MessageEvent, Scheduling) ->
+  #message_event{message = Message} = MessageEvent,
+  case Scheduling of
+    pair_of_receive ->
+      Message;
+    pair_of_event_type_receive ->
+      #message{data = Data} = Message,
+      Data
+  end.
+
+extract_message_from_queue(Queue, Acc, Scheduling) ->
+  case queue:is_empty(Queue) of
+    true -> 
+      Acc;
+    false ->
+      {Value, NewQueue} = queue:out(Queue),
+      {value, MessageEvent} = Value,
+      Data = get_data_from_message_event(MessageEvent, Scheduling),
+      NewAcc = queue:in(Data, Acc),
+      extract_message_from_queue(NewQueue, NewAcc, Scheduling)
+  end.
+
+find_receive_messages([], Acc, _) -> 
+  Acc;
+find_receive_messages([{Channel, Queue}|Rest], Acc, Scheduling) ->
+  {_, Receiver} = Channel,
+  DataMessages = extract_message_from_queue(Queue, queue:new(), Scheduling),
+  NewAcc = update_map(Receiver, DataMessages, Acc),  
+  find_receive_messages(Rest, NewAcc, Scheduling);
+find_receive_messages([_|Rest], Acc, Scheduling) ->
+  find_receive_messages(Rest, Acc, Scheduling).
+
+merge_maps(Map1, Map2) ->
+    Keys1 = maps:keys(Map1),
+    Keys2 = maps:keys(Map2),
+    CombinedKeys = lists:usort(Keys1 ++ Keys2),
+    lists:foldl(fun(Key, Acc) ->
+        case {maps:is_key(Key, Map1), maps:is_key(Key, Map2)} of
+            {true, true} ->
+                Queue1 = maps:get(Key, Map1),
+                Queue2 = maps:get(Key, Map2),
+                NewQueue = queue:join(Queue2, Queue1), 
+                maps:put(Key, NewQueue, Acc);
+            {true, false} ->
+                maps:put(Key, maps:get(Key, Map1), Acc);
+            {false, true} ->
+                maps:put(Key, maps:get(Key, Map2), Acc)
+        end
+    end, #{}, CombinedKeys).
+
+find_pair_of_receives([], _) -> #{};
+find_pair_of_receives([TraceState|Rest], Scheduling) -> 
+  #trace_state{actors = Actors} = TraceState,
+  NewReceives = find_receive_messages(Actors, #{}, Scheduling),
+  merge_maps( NewReceives, find_pair_of_receives(Rest, Scheduling)).
+
+check_in_queue(_, _, []) -> 
+  false; 
+check_in_queue(Element1, Element2, [Element1, Element2 | _]) -> 
+  true;  
+check_in_queue(Element1, Element2, [_ | Rest]) -> 
+  check_in_queue(Element1, Element2, Rest).
+
+is_increase_coverage_with_list([], _, _) ->
+  false; 
+is_increase_coverage_with_list([Event], PreviousEventQueue, Scheduling) ->
+  FirstEvent = queue:get(PreviousEventQueue),
+  case check_in_queue(get_data_from_message_event(Event, Scheduling), FirstEvent, queue:to_list(PreviousEventQueue)) of
+    false ->
+      true;
+    true ->
+      false
+  end;
+is_increase_coverage_with_list([Event, Rest], PreviousEventQueue, Scheduling) ->
+  FirstEvent = queue:get(PreviousEventQueue),
+  case check_in_queue(get_data_from_message_event(Event, Scheduling), FirstEvent, queue:to_list(PreviousEventQueue)) of
+    false ->
+      true;
+    true ->
+      is_increase_coverage_with_list(Rest, PreviousEventQueue, Scheduling)
+  end.
+
+is_increase_coverage(Actor, ActorEvents, Receives, Scheduling) ->
+  case maps:is_key(Actor, Receives) of
+    false -> 
+      false; 
+    true -> 
+      is_increase_coverage_with_list(ActorEvents, maps:get(Actor, Receives), Scheduling)
+  end.
+
+sort_actors([], _, Acc, _) -> Acc;
+sort_actors([Actor|Rest], Receives, Acc, Scheduling) ->
+  case ?is_channel(Actor) of
+    false -> 
+      sort_actors(Rest, Receives, Acc ++ [Actor], Scheduling);
+    true ->
+      {Channel, Queue} = Actor,
+      {_, Receiver} = Channel,
+      case is_increase_coverage(Receiver, queue:to_list(Queue), Receives, Scheduling) of
+        false -> 
+          sort_actors(Rest, Receives, Acc ++ [Actor], Scheduling);
+        true ->
+          sort_actors(Rest, Receives, [Actor] ++ Acc, Scheduling)
+      end
+  end.
+
+sort_actors([], _, _) ->
+  [];
+sort_actors(Actors, Receives, Scheduling) ->
+  sort_actors(Actors, Receives, [], Scheduling).
+
+pair_of_receive_schedule(State, Actors, Scheduling) ->
+  #scheduler_state{trace = [_|RestState]} = State,
+  Receives = find_pair_of_receives(RestState, Scheduling),
+  sort_actors(Actors, Receives, Scheduling).
+
+%%%%%%%%% end
+
 schedule_sort([], _State) -> [];
 schedule_sort(Actors, State) ->
   #scheduler_state{
@@ -468,7 +597,11 @@ schedule_sort(Actors, State) ->
       round_robin ->
         Split = fun(E) -> E =/= LastScheduled end,
         {Pre, Post} = lists:splitwith(Split, Actors),
-        Post ++ Pre
+        Post ++ Pre;
+      pair_of_receive -> 
+        pair_of_receive_schedule(State, Actors, Scheduling);
+      pair_of_event_type_receive ->
+        pair_of_receive_schedule(State, Actors, Scheduling)
     end,
   case StrictScheduling of
     true when Scheduling =:= round_robin ->

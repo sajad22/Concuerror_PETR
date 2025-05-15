@@ -41,7 +41,7 @@ _concuerror()
             COMPREPLY=($(compgen -W "bpor delay none ubpor" -- ${cur}))
             ;;
         --scheduling)
-            COMPREPLY=($(compgen -W "newest oldest round_robin" -- ${cur}))
+            COMPREPLY=($(compgen -W "newest oldest round_robin  pair_of_receive pair_of_event_type_receive" -- ${cur}))
             ;;
         -a|--after_timeout|-i|--interleaving_bound|--timeout)
             COMPREPLY=($(compgen -W "infinity" -- ${cur}))
