@@ -9,7 +9,7 @@ Concuerror is a stateless model checking tool for Erlang programs. It can be use
 [Visit the website][website] for documentation, examples, tutorials, publications, and many more!
 
 # Changes for supporting PETR coverage
-This repository was created as part of the work for the paper “Coverage Metrics for Actor Model Programs: A Model-Based Approach.” It extends Concuerror, a systematic concurrency testing tool for Erlang programs, by integrating the PETR coverage metric as a guiding mechanism for scheduling decisions. The modifications aim to enhance Concuerror’s ability to explore execution paths more effectively by leveraging model-based coverage metrics. For more details, please refer to the original paper and the extended implementation provided in this repository.
+This repository was created as part of the work for the paper “Coverage Metrics for Actor Model Programs: A Model-Based Approach.” It extends Concuerror, a systematic concurrency testing tool for Erlang programs, by integrating the PETR coverage metric as a guiding mechanism for scheduling decisions. The modifications aim to enhance Concuerror’s ability to explore execution paths more effectively by leveraging model-based coverage metrics. With this change we have pair_of_event_type_receive in shchudling option like oldest and newest in [scheduling option][https://hexdocs.pm/concuerror/concuerror_options.html#type-scheduling] . For more details, please refer to the original paper and the extended implementation provided in this repository.
 
 ## Supported OTP Releases
 
