@@ -73,6 +73,12 @@ tests-2: bin/$(NAME)
 	@$(RM) tests/thediff
 	@(cd tests; ./runtests.py suites/b[^a]*/src/* suites/[^b]*/src/*)
 
+
+.PHONY: tests-3
+tests-3: bin/$(NAME)
+	@$(RM) tests/thediff
+	@(cd tests; ./runtests.py $(SC) suites/ba*/src/*)
+
 ## -j 1: ensure that the outputs of different suites are not interleaved
 .PHONY: tests-real
 tests-real: bin/$(NAME)

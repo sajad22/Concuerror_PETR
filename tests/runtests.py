@@ -11,7 +11,7 @@ from multiprocessing import Process, Lock, Value, BoundedSemaphore, cpu_count
 
 #---------------------------------------------------------------------
 # Extract scenarios from the specified test
-def runTest(test):
+def runTest(test, sc):
     global dirname
     global results
     global sema1
@@ -115,11 +115,11 @@ def runScenario(suite, name, modn, funn, preb, flags, files):
     # Run concuerror
     status = os.system(
         ("%s -kq --assume_racing false"
-         " %s -f %s"
+         " %s --instant_delivery false --scheduling %s -f %s"
          " --output %s"
          " -m %s -t %s %s %s"
          )
-        % (concuerror, dpor_flag, " ".join(files),
+        % (concuerror, dpor_flag, sc, " ".join(files),
            rslt, modn, funn, bound, bound_type))
     # Compare the results
     has_crash = "crash" in flags
@@ -177,12 +177,13 @@ assert 0 == os.system("erlc scenarios.erl")
 
 # If we have arguments we should use them as tests,
 # otherwise check them all
-if len(sys.argv) > 1:
-    tests = sys.argv[1:]
+if len(sys.argv) > 2:
+    tests = sys.argv[2:]
     tests = [os.path.abspath(item) for item in tests]
 else:
     tests = glob.glob(dirname + "/suites/*/src/*")
 
+sc = sys.argv[1]
 # How many threads we want (default, number of CPUs in the system)
 threads = os.getenv("THREADS", "")
 if threads == "":
@@ -209,7 +210,7 @@ sema1 = BoundedSemaphore(int(threads))
 # For every test do
 procT = []
 for test in tests:
-    p = Process(target=runTest, args=(test,))
+    p = Process(target=runTest, args=(test,sc))
     procT.append(p)
     sema1.acquire()
     p.start()
